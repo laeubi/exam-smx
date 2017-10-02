@@ -1,11 +1,14 @@
 package examsmx.camel;
 
+import static org.junit.Assert.assertEquals;
+
 import javax.inject.Inject;
 
 import org.apache.camel.CamelContext;
+import org.apache.camel.Exchange;
+import org.apache.camel.Processor;
 import org.apache.camel.component.mock.MockEndpoint;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.ops4j.pax.exam.CoreOptions;
@@ -43,38 +46,61 @@ public class CamelBlueprintModuleTest implements ConfigBase {
 						.editConfigurationFilePut("etc/camel.blueprint.cfg", "message", "Hello JUnitTest") };
 	}
 
-	@Before
-	public void setupTestSupport() throws Exception {
-		testSupport1 = new ContextBasedCamelTestSupport(camelContext1) {
-			@Override
-			public String isMockEndpoints() {
-				return "log:test";
-			}
-
-			@Override
-			protected void doPreSetup() throws Exception {
-				replaceRouteFromWith("timerRoute", EP_FROM);
-			}
-
-		};
-		testSupport2 = new ContextBasedCamelTestSupport(camelContext2) {
-
-		};
-	}
-
-	@After
-	public void shutdownTestSupport() {
-		testSupport1.tearDown();
-		testSupport2.tearDown();
-	}
 
 	@Test
-	public void routeTest() throws InterruptedException {
-		testSupport1.template().sendBody(EP_FROM, "-");
-		MockEndpoint ep = testSupport1.getMockEndpoint(EP_TARGET);
+	public void routeTest() throws Exception {
+		getTestsupport1().template().sendBody(EP_FROM, "-");
+		MockEndpoint ep = getTestsupport1().getMockEndpoint(EP_TARGET);
 		ep.expectedMessageCount(1);
 		ep.message(0).header("myHeader").endsWith("JUnitTest");
-		testSupport1.assertMockEndpointsSatisfied();
+		getTestsupport1().assertMockEndpointsSatisfied();
+	}
+	
+	@Test
+	public void routeTest2() throws Exception {
+		MockEndpoint ep = getTestsupport2().getMockEndpoint("mock:file:/tmp/input");
+		String body = "REPLACED";
+		ep.whenAnyExchangeReceived(new Processor() {
+			
+			@Override
+			public void process(Exchange exchange) throws Exception {
+				exchange.getIn().setBody(body);
+			}
+		});
+		Object requestBody = getTestsupport2().template().requestBody("file:/tmp/input", "TEST");
+		assertEquals(body, requestBody);
+	}
+
+	@Rule
+	public ContextBasedCamelTestSupport getTestsupport1() throws Exception {
+		if (testSupport1 == null) {
+			testSupport1 = new ContextBasedCamelTestSupport(camelContext1) {
+				@Override
+				public String isMockEndpoints() {
+					return "log:test";
+				}
+
+				@Override
+				protected void doPreSetup() throws Exception {
+					replaceRouteFromWith("timerRoute", EP_FROM);
+				}
+
+			};
+		}
+		return testSupport1;
+	}
+	
+	@Rule
+	public ContextBasedCamelTestSupport getTestsupport2() throws Exception {
+		if (testSupport2 == null) {
+			testSupport2 = new ContextBasedCamelTestSupport(camelContext2) {
+				@Override
+				public String isMockEndpointsAndSkip() {
+					return "file:*";
+				}
+			};
+		}
+		return testSupport2;
 	}
 
 }

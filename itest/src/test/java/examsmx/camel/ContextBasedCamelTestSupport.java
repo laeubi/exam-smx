@@ -1,5 +1,7 @@
 package examsmx.camel;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -7,10 +9,17 @@ import org.apache.camel.CamelContext;
 import org.apache.camel.Endpoint;
 import org.apache.camel.Exchange;
 import org.apache.camel.NoSuchEndpointException;
+import org.apache.camel.Service;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.model.ModelCamelContext;
 import org.apache.camel.spi.Language;
 import org.apache.camel.test.junit4.CamelTestSupport;
+import org.junit.Rule;
+import org.junit.rules.MethodRule;
+import org.junit.rules.TestRule;
+import org.junit.runner.Description;
+import org.junit.runners.model.FrameworkMethod;
+import org.junit.runners.model.Statement;
 
 /**
  * Enables TestSupport for a given CamelContext obtained from a different source
@@ -19,17 +28,27 @@ import org.apache.camel.test.junit4.CamelTestSupport;
  * protected methods public e.g. the {@link #getMandatoryEndpoint(String)}
  *
  */
-public class ContextBasedCamelTestSupport extends CamelTestSupport {
+public class ContextBasedCamelTestSupport extends CamelTestSupport implements MethodRule {
 
 	private CamelContext camelContext;
 
 	public ContextBasedCamelTestSupport(CamelContext camelContext) throws Exception {
 		context = (ModelCamelContext) camelContext;
-		if (camelContext == null)  {
+		if (camelContext == null) {
 			throw new IllegalArgumentException("CamelContext can't be null");
 		}
 		this.camelContext = camelContext;
-		setUp();
+		//we don't want to start/stop the camel context so prevent this by setting up a service for this
+		setCamelContextService(new Service() {
+
+			@Override
+			public void stop() throws Exception {
+			}
+
+			@Override
+			public void start() throws Exception {
+			}
+		});
 	}
 
 	public CamelContext getCamelContext() {
@@ -135,10 +154,10 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 	public final void stopCamelContext() throws Exception {
 		// not needed
 	}
-	
+
 	@Override
 	public final void postProcessTest() throws Exception {
-		//do not fetch from statics to prevent intermixing of camel context
+		// do not fetch from statics to prevent intermixing of camel context
 		applyCamelPostProcessor();
 	}
 
@@ -146,10 +165,16 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 	protected final CamelContext createCamelContext() throws Exception {
 		return camelContext;
 	}
-	
+
 	@Override
 	public Endpoint getMandatoryEndpoint(String uri) {
 		return super.getMandatoryEndpoint(uri);
+	}
+
+	@Override
+	public String getTestMethodName() {
+		return camelContext.getName() + " / " + super.getTestMethodName();// +
+																			// testMethodName;
 	}
 
 	@Override
@@ -158,17 +183,40 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 	}
 
 	@Override
-	public void tearDown() {
-		try {
-			super.tearDown();
-			template().stop();
-		} catch (Exception e) {
-			throw new RuntimeException("error in tear down", e);
-		}
-	}
+	public Statement apply(Statement base, FrameworkMethod method, Object target) {
+		Statement statement = new Statement() {
 
-	public String getTestMethodName() {
-		return camelContext.getName();
+			@Override
+			public void evaluate() throws Throwable {
+				setUp();
+				try {
+					base.evaluate();
+				} finally {
+					tearDown();
+				}
+			}
+		};
+		// call camel rule methods that are normally called by JUnit
+		Method[] methods = CamelTestSupport.class.getMethods();
+		for (Method m : methods) {
+			if (m.isAnnotationPresent(Rule.class)) {
+				System.out.println("Method with @Rule: " + m);
+				try {
+					Object subRule = m.invoke(this);
+					if (subRule instanceof MethodRule) {
+						MethodRule methodRule = (MethodRule) subRule;
+						statement = methodRule.apply(statement, method, target);
+					} else if (subRule instanceof TestRule) {
+						TestRule testRule = (TestRule) subRule;
+						statement = testRule.apply(statement,
+								Description.createTestDescription(method.getDeclaringClass(), method.getName()));
+					}
+				} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return statement;
 	}
 
 }
