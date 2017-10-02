@@ -8,6 +8,7 @@ import org.apache.camel.Endpoint;
 import org.apache.camel.Exchange;
 import org.apache.camel.NoSuchEndpointException;
 import org.apache.camel.component.mock.MockEndpoint;
+import org.apache.camel.model.ModelCamelContext;
 import org.apache.camel.spi.Language;
 import org.apache.camel.test.junit4.CamelTestSupport;
 
@@ -23,8 +24,16 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 	private CamelContext camelContext;
 
 	public ContextBasedCamelTestSupport(CamelContext camelContext) throws Exception {
+		context = (ModelCamelContext) camelContext;
+		if (camelContext == null)  {
+			throw new IllegalArgumentException("CamelContext can't be null");
+		}
 		this.camelContext = camelContext;
 		setUp();
+	}
+
+	public CamelContext getCamelContext() {
+		return camelContext;
 	}
 
 	@Override
@@ -89,7 +98,7 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 
 	@Override
 	public void resetMocks() {
-		super.resetMocks();
+		MockEndpoint.resetMocks(camelContext);
 	}
 
 	@Override
@@ -114,7 +123,7 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 
 	@Override
 	public final boolean isCreateCamelContextPerClass() {
-		return true;
+		return false;
 	}
 
 	@Override
@@ -126,12 +135,18 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 	public final void stopCamelContext() throws Exception {
 		// not needed
 	}
+	
+	@Override
+	public final void postProcessTest() throws Exception {
+		//do not fetch from statics to prevent intermixing of camel context
+		applyCamelPostProcessor();
+	}
 
 	@Override
 	protected final CamelContext createCamelContext() throws Exception {
 		return camelContext;
 	}
-
+	
 	@Override
 	public Endpoint getMandatoryEndpoint(String uri) {
 		return super.getMandatoryEndpoint(uri);
@@ -140,6 +155,20 @@ public class ContextBasedCamelTestSupport extends CamelTestSupport {
 	@Override
 	public void assertMockEndpointsSatisfied() throws InterruptedException {
 		super.assertMockEndpointsSatisfied();
+	}
+
+	@Override
+	public void tearDown() {
+		try {
+			super.tearDown();
+			template().stop();
+		} catch (Exception e) {
+			throw new RuntimeException("error in tear down", e);
+		}
+	}
+
+	public String getTestMethodName() {
+		return camelContext.getName();
 	}
 
 }

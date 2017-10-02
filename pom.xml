@@ -34,6 +34,7 @@
 
 	<modules>
 		<module>camel-blueprint</module>
+		<module>camel-blueprint-2</module>
 		<module>itest</module>
 	</modules>
 

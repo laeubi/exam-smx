@@ -24,6 +24,11 @@
 			<artifactId>camel-blueprint</artifactId>
 			<version>0.0.1</version>
 		</dependency>
+		<dependency>
+			<groupId>exam-smx</groupId>
+			<artifactId>camel-blueprint-2</artifactId>
+			<version>0.0.1</version>
+		</dependency>
 		<!-- dependencies of libs use inside SMX -->
 		<dependency>
 			<groupId>org.apache.camel</groupId>
