@@ -38,6 +38,9 @@ public interface ConfigBase {
 				              logLevel(LogLevelOption.LogLevel.INFO),
 				               editConfigurationFilePut("etc/custom.properties", "karaf.delay.console", "false"),
 				               editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg", "log4j.logger.org.apache.karaf.features", "WARN"),
+				               editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg", "log4j.logger.org.apache.camel.core.osgi", "DEBUG"),
+				               editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg", "log4j.logger.org.apache.camel.blueprint", "DEBUG"),
+				               editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg", "log4j.logger.org.apache.camel.blueprint.BlueprintCamelContext", "TRACE"),
 				               editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg", "log4j.logger.org.apache.aries.spifly", "WARN"),
 		};
 		// @formatter:on
